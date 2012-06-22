@@ -12,6 +12,11 @@
 #ifndef _MACHINE_H__
 #define _MACHINE_H__
 
+#include <vector>
+#include <ctime>
+#include <cstdlib>
+#include <sys/time.h>
+
 #include <shogun/lib/common.h>
 #include <shogun/base/SGObject.h>
 #include <shogun/labels/Labels.h>
@@ -103,6 +108,41 @@ enum EProblemType
 	PT_MULTICLASS = 2,
 	PT_STRUCTURED = 3
 };
+
+//credit: http://stackoverflow.com/questions/3797708/millisecond-accurate-benchmarking-in-c
+class Timer
+{
+    timeval timer[2];
+
+  public:
+
+    timeval start()
+    {
+        gettimeofday(&this->timer[0], NULL);
+        return this->timer[0];
+    }
+
+    timeval stop()
+    {
+        gettimeofday(&this->timer[1], NULL);
+        return this->timer[1];
+    }
+
+    int duration() const
+    {
+        int secs(this->timer[1].tv_sec - this->timer[0].tv_sec);
+        int usecs(this->timer[1].tv_usec - this->timer[0].tv_usec);
+
+        if(usecs < 0)
+        {
+            --secs;
+            usecs += 1000000;
+        }
+
+        return static_cast<int32_t>(secs * 1000 + usecs / 1000.0 + 0.5);
+    }
+};
+
 
 #define MACHINE_PROBLEM_TYPE(PT) \
 	/** returns default problem type machine solves \
@@ -269,6 +309,93 @@ class CMachine : public CSGObject
 
 		virtual const char* get_name() const { return "Machine"; }
 
+		//#################################################################
+		/** TIMING CODE FOR ECML SUBMISSION */
+		//#################################################################
+		/** punch the clock
+		 *
+		 * @return start measuring training time
+		 */
+		inline void punch_clock_in()
+		{
+            timer.start();
+		}
+
+		/** punch the clock
+		 *
+		 * @return stop measuring training time
+		 */
+		inline void punch_clock_out()
+		{
+            timer.stop();
+			training_time += timer.duration();
+		}
+
+		/** get training time
+		 *
+		 * @return get training time when clock was punched the last time
+		 */
+		inline int32_t get_training_time()
+		{
+			return training_time;
+		}
+
+		/** get training times
+		 *
+		 * @return vector of training times
+		 */
+		inline std::vector<int32_t> get_training_times()
+		{
+			return training_times;
+		}
+
+		/** set record_interval
+		 *
+		 * @return set interval in which to record objective
+		 */
+		inline int32_t set_record_interval(int32_t ri)
+		{
+            SG_INFO("computing objective every %i iterations\n", ri);
+			return record_interval = ri;
+		}
+
+		/** set target objective
+		 *
+		 * @return target objective
+		 */
+		inline int32_t set_target_objective(float64_t to)
+		{
+			return target_obj = to;
+		}
+
+		/** get dual objectives
+		 *
+		 * @return vector of dual objectives
+		 */
+		inline std::vector<float64_t> get_dual_objectives()
+		{
+			return dual_objectives;
+		}
+
+		/** get primal objectives
+		 *
+		 * @return vector of primal objectives
+		 */
+		inline std::vector<float64_t> get_primal_objectives()
+		{
+			return primal_objectives;
+		}
+
+		/** get gaps
+		 *
+		 * @return vector of dual objectives
+		 */
+		inline std::vector<float64_t> get_gaps()
+		{
+			return gaps;
+		}
+
+
 	protected:
 		/** train machine
 		 *
@@ -332,6 +459,24 @@ class CMachine : public CSGObject
 
 		/** whether data is locked */
 		bool m_data_locked;
+
+		//#################################################################
+		/** TIMING CODE FOR ECML SUBMISSION */
+		//#################################################################
+
+        /** training time in seconds */
+        int32_t training_time;
+
+        /** last timestamp */
+        Timer timer;
+
+        /** some variables to track progress */
+        int32_t record_interval;
+        float64_t target_obj;
+        std::vector<int32_t> training_times;
+        std::vector<float64_t> primal_objectives;
+        std::vector<float64_t> dual_objectives;
+        std::vector<float64_t> gaps;
 };
 }
 #endif // _MACHINE_H__

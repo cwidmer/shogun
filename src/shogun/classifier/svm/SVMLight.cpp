@@ -631,6 +631,20 @@ int32_t CSVMLight::optimize_to_convergence(int32_t* docs, int32_t* label, int32_
   CTime start_time;
   mkl_converged=false;
 
+  //TIMING CODE FOR ECML
+  if (record_interval > 0) {
+    training_times.push_back(0);
+
+    // compute objective
+    float64_t obj = compute_objective_function(a,lin,c,learn_parm->eps,label,totdoc);
+    dual_objectives.push_back(obj);
+    SG_INFO("benchmark svmlight\t%i\t%.12e\t%.12e\n", 0, obj, fabs(obj) - fabs(target_obj));
+
+    // punch the clock
+    punch_clock_in();
+  }
+
+
 
 #ifdef CYGWIN
   for (;((iteration<100 || (!mkl_converged && callback) ) || (retrain && (!terminate))); iteration++){
@@ -901,6 +915,23 @@ int32_t CSVMLight::optimize_to_convergence(int32_t* docs, int32_t* label, int32_
 	      terminate = 1;
 	      retrain = 0;
 	  }
+
+	// TIMING CODE FOR ECML
+	// record progress
+	if (record_interval != 0 && (iteration % record_interval == 0 || iteration < 100))
+	{
+		// stop tracking time
+		punch_clock_out();
+		training_times.push_back(training_time);
+
+		// compute objective
+		float64_t obj = compute_objective_function(a,lin,c,learn_parm->eps,label,totdoc);
+		dual_objectives.push_back(obj);
+		SG_INFO("benchmark svmlight\t%i\t%.12e\t%.12e\n", training_time, obj, fabs(obj) - fabs(target_obj));
+
+		// start tracking again
+		punch_clock_in();
+	}
 
   } /* end of loop */
 
@@ -2121,7 +2152,9 @@ void CSVMLight::reactivate_inactive_examples(
 
 		  if (num_modified>0)
 		  {
-			  int32_t num_threads=parallel->get_num_threads();
+			  // FIXED TO ONE THREAD FOR ECML
+			  int32_t num_threads=1;
+			  //int32_t num_threads=parallel->get_num_threads();
 			  ASSERT(num_threads>0);
 			  if (num_threads < 2)
 			  {
@@ -2256,8 +2289,9 @@ void CSVMLight::reactivate_inactive_examples(
 		  compute_index(changed,totdoc,changed2dnum);
 
 
-		  //TODO: PUT THIS BACK IN!!!!!!!! int32_t num_threads=parallel->get_num_threads();
+		  // FIXED TO ONE THREAD FOR ECML
 		  int32_t num_threads=1;
+
 		  ASSERT(num_threads>0);
 
 		  if (num_threads < 2)
@@ -2517,7 +2551,7 @@ float64_t* CSVMLight::optimize_qp(
 		}
 	}
 
-	// TODO: add parameter for this (e.g. for MTL experiments)
+	// THIS WAS ADJUSTED FOR ECML to avoid premature quitting of SVMLight solver
 	if(precision_violations > 5000) {
 		(*epsilon_crit)*=10.0;
 		precision_violations=0;

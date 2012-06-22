@@ -241,6 +241,23 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 		alphas[i] = 0;
 	}
 
+	// timing code for ECML paper
+    if (record_interval > 0) {
+
+        training_times.push_back(0);
+
+        // compute objective
+        float64_t obj = compute_primal_obj();
+        primal_objectives.push_back(obj);
+        float64_t d_obj = compute_dual_obj();
+        dual_objectives.push_back(d_obj);
+
+        SG_INFO("benchmark dcd\t%i\t%.12e\n", 0, obj - target_obj);
+        
+        // punch the clock
+        punch_clock_in();
+    }
+
 	for(i=0; i<l; i++)
 	{
 		if(prob->y[i] > 0)
@@ -357,6 +374,25 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 		float64_t gap=PGmax_new - PGmin_new;
 		SG_SABS_PROGRESS(gap, -CMath::log10(gap), -CMath::log10(1), -CMath::log10(eps), 6);
 
+        // record progress
+        if (record_interval != 0 && (iter % record_interval == 0 || iter < 10))
+        {
+            // stop tracking time
+            punch_clock_out();
+            training_times.push_back(training_time);
+            gaps.push_back(gap);
+
+            // compute objective
+            float64_t obj = compute_primal_obj();
+            primal_objectives.push_back(obj);
+            float64_t d_obj = compute_dual_obj();
+            dual_objectives.push_back(d_obj);
+            SG_INFO("benchmark dcd\t%i\t%.12e\n", training_time, obj - target_obj);
+
+            // start tracking again
+            punch_clock_in();
+        }
+
 		if(gap <= eps)
 		{
 			if(active_size == l)
@@ -385,7 +421,11 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 				"(also see liblinear FAQ)\n\n");
 	}
 
-
+    if (record_interval != 0 && iter % record_interval == 0)
+    {
+        // punch the clock
+        punch_clock_out();
+    }
 
 	delete [] QD;
 	//delete [] alpha;
