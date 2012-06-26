@@ -128,8 +128,9 @@ class Timer
         return this->timer[1];
     }
 
-    int duration() const
+    int duration()
     {
+        gettimeofday(&this->timer[1], NULL);
         int secs(this->timer[1].tv_sec - this->timer[0].tv_sec);
         int usecs(this->timer[1].tv_usec - this->timer[0].tv_usec);
 
@@ -359,6 +360,16 @@ class CMachine : public CSGObject
 			return record_interval = ri;
 		}
 
+		/** set min_interval
+		 *
+		 * @return set minimal time interval for obj computation
+		 */
+		inline int32_t set_min_interval(int32_t mi)
+		{
+			return min_interval = mi;
+		}
+
+
 		/** set target objective
 		 *
 		 * @return target objective
@@ -472,6 +483,7 @@ class CMachine : public CSGObject
 
         /** some variables to track progress */
         int32_t record_interval;
+        int32_t min_interval;
         float64_t target_obj;
         std::vector<int32_t> training_times;
         std::vector<float64_t> primal_objectives;

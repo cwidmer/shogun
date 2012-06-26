@@ -918,8 +918,9 @@ int32_t CSVMLight::optimize_to_convergence(int32_t* docs, int32_t* label, int32_
 
 	// TIMING CODE FOR ECML
 	// record progress
-	if (record_interval != 0 && (iteration % record_interval == 0 || iteration < 100))
+	if (record_interval != 0 && (iteration % record_interval == 0 && timer.duration() >= min_interval || iteration < 10))
 	{
+		SG_INFO("timer duration:%i, iteration: %i, min_interval: %i\n", timer.duration(), iteration, min_interval);
 		// stop tracking time
 		punch_clock_out();
 		training_times.push_back(training_time);

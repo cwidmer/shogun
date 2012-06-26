@@ -375,8 +375,11 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 		SG_SABS_PROGRESS(gap, -CMath::log10(gap), -CMath::log10(1), -CMath::log10(eps), 6);
 
         // record progress
-        if (record_interval != 0 && (iter % record_interval == 0 || iter < 10))
+        if (record_interval != 0 && (iter % record_interval == 0 && timer.duration() >= min_interval || iter < 10))
         {
+
+			SG_INFO("timer duration:%i, iteration: %i, min_interval: %i\n", timer.duration(), iter, min_interval);
+
             // stop tracking time
             punch_clock_out();
             training_times.push_back(training_time);
