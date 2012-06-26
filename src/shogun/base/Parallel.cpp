@@ -37,7 +37,8 @@ Parallel::~Parallel()
 int32_t Parallel::get_num_cpus() const
 {
 #if defined(LINUX) && defined(_SC_NPROCESSORS_ONLN)
-		return sysconf( _SC_NPROCESSORS_ONLN );
+		//FIX TO ONE THREAD BY DEFAULT FOR ECML2012
+		return 1;
 #elif defined(DARWIN)
 		int num; /* for calling external lib */
 		size_t size=sizeof(num);
