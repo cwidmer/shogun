@@ -141,6 +141,7 @@ void CSVMLight::init()
 	model_b=0;
 	verbosity=1;
 	opt_precision=DEF_PRECISION;
+	training_time=0;
 
 	// svm variables
 	W=NULL;
@@ -189,7 +190,7 @@ bool CSVMLight::train_machine(CFeatures* data)
 	learn_parm->skip_final_opt_check=0;
 	learn_parm->svm_maxqpsize=get_qpsize();
 	learn_parm->svm_newvarsinqp=learn_parm->svm_maxqpsize-1;
-	learn_parm->maxiter=100000;
+	learn_parm->maxiter=10000000;
 	learn_parm->svm_iter_to_shrink=100;
 	learn_parm->svm_c=C1;
 	learn_parm->transduction_posratio=0.33;
@@ -920,6 +921,7 @@ int32_t CSVMLight::optimize_to_convergence(int32_t* docs, int32_t* label, int32_
 	// record progress
 	if (record_interval != 0 && (iteration % record_interval == 0 && timer.duration() >= min_interval || iteration < 10))
 	{
+  		SG_DEBUG( "inactive:%d\n", inactivenum);
 		SG_INFO("timer duration:%i, iteration: %i, min_interval: %i\n", timer.duration(), iteration, min_interval);
 		// stop tracking time
 		punch_clock_out();
@@ -957,6 +959,14 @@ int32_t CSVMLight::optimize_to_convergence(int32_t* docs, int32_t* label, int32_
   //use this for our purposes!
   criterion=compute_objective_function(a,lin,c,learn_parm->eps,label,totdoc);
   CSVM::set_objective(criterion);
+
+  if (record_interval > 0) {
+      // punch the clock
+      punch_clock_out();
+	  training_times.push_back(training_time);
+	  dual_objectives.push_back(criterion);
+	  SG_INFO("final benchmark svmlight\t%i\t%.12e\n", training_time, criterion);
+  }
 
   SG_FREE(chosen);
   SG_FREE(last_suboptimal_at);

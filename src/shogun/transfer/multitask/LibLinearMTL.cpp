@@ -424,10 +424,18 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 				"(also see liblinear FAQ)\n\n");
 	}
 
-    if (record_interval != 0 && iter % record_interval == 0)
+    if (record_interval != 0)
     {
         // punch the clock
         punch_clock_out();
+		training_times.push_back(training_time);
+
+		// compute objective
+		float64_t obj = compute_primal_obj();
+		primal_objectives.push_back(obj);
+		float64_t d_obj = compute_dual_obj();
+		dual_objectives.push_back(d_obj);
+		SG_INFO("benchmark dcd\t%i\t%.12e\n", training_time, obj - target_obj);
     }
 
 	delete [] QD;
