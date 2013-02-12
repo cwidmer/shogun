@@ -7,7 +7,7 @@
  * Written (W) 2011-2012 Christian Widmer
  * Written (W) 2007-2010 Soeren Sonnenburg
  * Copyright (c) 2007-2009 The LIBLINEAR Project.
- * Copyright (C) 2007-2012 Fraunhofer Institute FIRST and Max-Planck-Society
+ * Copyright (C) 2007-2013 Fraunhofer FIRST, MPG, TU-Berlin, MSKCC
  */
 
 #include <vector>
@@ -279,16 +279,11 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 		    typedef std::map<index_t, float64_t>::const_iterator map_iter;
 
 			float64_t inner_sum = 0;
-			for (map_iter it=task_similarity_matrix.data[ti].begin(); it!=task_similarity_matrix.data[ti].end(); it++)
+			for (int32_t k=0; k!=num_tasks; k++)
 			{
-				
-				// get data from sparse matrix
-				int32_t e_i = it->first;
-                float64_t sim = it->second;
-
-				// fetch vector
-				float64_t* tmp_w = V.get_column_vector(e_i);
-				inner_sum += sim * yi * prob->x->dense_dot(i, tmp_w, n);
+				//inner_sum += M[t,ti] * all_lt[i] * np.dot(V[t,:], all_xt[i])
+				float64_t* tmp_w = V.get_column_vector(k);
+				inner_sum += task_similarity_matrix.matrix[k*num_tasks+ti] * yi * prob->x->dense_dot(i, tmp_w, n);
 
 				//possibly deal with bias
 				//if (prob->use_bias)

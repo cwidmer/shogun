@@ -4,10 +4,10 @@
  * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
- * Written (W) 2011-2012 Christian Widmer
+ * Written (W) 2011-2013 Christian Widmer
  * Written (W) 2007-2010 Soeren Sonnenburg
  * Copyright (c) 2007-2009 The LIBLINEAR Project.
- * Copyright (C) 2007-2012 Fraunhofer Institute FIRST and Max-Planck-Society
+ * Copyright (C) 2007-2013 Fraunhofer FIRST, MPG, TU-Berlin, MSKCC
  */
 
 #ifndef _LIBLINEARMTL_H___
@@ -27,63 +27,6 @@ namespace shogun
 {
 
 #ifdef HAVE_LAPACK
-
-
-/** @brief mapped sparse matrix for 
- * representing graph relations of tasks
- */
-class MappedSparseMatrix
-{
-
-    public:
-
-    /** operator overload for matrix read only access
-     * @param i_row
-     * @param i_col
-     */
-    inline const float64_t operator()(index_t i_row, index_t i_col) const
-    {
-
-		// lookup complexity is O(log n)
-		std::map<index_t, float64_t>::const_iterator it = data[i_row].find(i_col);
-
-		if (it != data[i_row].end())
-		{
-			// use mapping for lookup
-			return it->second;
-		} else {
-			return 0.0;
-		}
-	}
-
-    /** set matrix from SGSparseMatrix
-     * @param sgm
-     */
-    void set_from_sparse(const SGSparseMatrix<float64_t> &sgm)
-    {
-        data.clear();
-
-        // deep copy sparse matrix
-        for (int32_t i=0; i!=sgm.num_vectors; i++)
-        {
-
-            SGSparseVector<float64_t> ts_row = sgm.sparse_matrix[i];
-            data.push_back(std::map<index_t, float64_t>());
-
-            for (int32_t k=0; k!=ts_row.num_feat_entries; k++)
-            {
-				// get data from sparse matrix
-				SGSparseVectorEntry<float64_t> e = ts_row.features[k];
-                data[i][e.feat_index] = e.entry;
-            }
-
-        }
-    }
-    
-	/** under-the-hood data structure  */
-    std::vector< std::map<index_t, float64_t> > data;
-
-};
 
 
 /** @brief class to implement LibLinear */
@@ -209,9 +152,9 @@ class CLibLinearMTL : public CLinearMachine
 		}
 
 		/** set task similarity matrix */
-		inline void set_task_similarity_matrix(SGSparseMatrix<float64_t> tsm)
+		inline void set_task_similarity_matrix(SGMatrix<float64_t> tsm)
 		{
-			task_similarity_matrix.set_from_sparse(tsm);
+			task_similarity_matrix = tsm;
 		}
 
 		/** set graph laplacian */
@@ -335,9 +278,7 @@ class CLibLinearMTL : public CLinearMachine
 		SGVector<int32_t> task_indicator_rhs;
 
 		/** task similarity matrix */
-		//SGMatrix<float64_t> task_similarity_matrix;
-		//SGSparseMatrix<float64_t> task_similarity_matrix;
-		MappedSparseMatrix task_similarity_matrix;
+		SGMatrix<float64_t> task_similarity_matrix;
 
 		/** task similarity matrix */
 		SGMatrix<float64_t> graph_laplacian;
