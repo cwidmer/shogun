@@ -29,6 +29,7 @@
 #endif
 #include <stdio.h>
 #include <shogun/lib/DataType.h>
+#include <iostream>
 
 #undef _POSIX_C_SOURCE
 extern "C" {
@@ -337,6 +338,8 @@ static bool matrix_to_numpy(PyObject* &obj, SGMatrix<type> sg_matrix, int typeco
 template <class type>
 static bool matrix_list_from_numpy(SGMatrixList<type>& sg_matrix_list, PyObject* obj, int typecode)
 {
+    std::cout << "trying to set up SGMatrixList" << std::endl;
+
     if (!is_pymatrix(obj, typecode))
     {
         PyErr_SetString(PyExc_TypeError,"not a numpy matrix of appropriate type");
@@ -1103,7 +1106,7 @@ TYPEMAP_OUT_SGMATRIX(PyObject,      NPY_OBJECT)
 
 %typemap(in) shogun::SGMatrixList<type>
 {
-    if (!matrix_list_from_numpy<type>($1, $input, typecode))
+    if (! matrix_list_from_numpy<type>($1, $input, typecode))
         SWIG_fail;
 }
 %enddef

@@ -21,6 +21,7 @@
 #include <shogun/machine/LinearMachine.h>
 #include <shogun/optimization/liblinear/shogun_liblinear.h>
 #include <shogun/lib/SGMatrixList.h>
+#include <shogun/lib/SGNDArray.h>
 
 
 namespace shogun
@@ -151,16 +152,46 @@ class CLibLinearMTL : public CLinearMachine
 			task_indicator_rhs = ti;
 		}
 
-		/** set task similarity matrix */
+		/** set Q */
 		inline void set_Q(SGMatrixList<float64_t> qm)
 		{
-			Q = qm;
+            Q = qm;
+		}
+
+		/** set Q */
+		inline void set_Q2(SGNDArray<float64_t> qm)
+		{
+            Q = SGMatrixList<float64_t>(qm.dims[0], qm.dims[1], qm.dims[2]);
+            //Q = SGMatrixList<float64_t>();
+            
+            for (int32_t i=0; i!=qm.dims[0]; i++)
+            {
+                Q[i] = SGMatrix<float64_t>(qm.get_matrix(i), qm.dims[1], qm.dims[2]);
+            }
+		}
+
+		/** get Q */
+		inline SGMatrix<float64_t> get_Qi(int32_t idx)
+		{
+			return Q[idx];
 		}
 
 		/** set task similarity matrix */
 		inline void set_Qi(SGMatrix<float64_t> qm, int32_t idx)
 		{
 			Q[idx] = qm;
+		}
+
+		/** get Q_inv */
+		inline SGNDArray<float64_t> get_Q_inv()
+		{
+			return Q_inv;
+		}
+
+		/** set Q_inv */
+		inline void set_Q_inv(SGNDArray<float64_t> qm)
+		{
+			Q_inv = qm;
 		}
 
 		/** set task similarity matrix */
@@ -291,6 +322,9 @@ class CLibLinearMTL : public CLinearMachine
 
 		/** multi Q */
 		SGMatrixList<float64_t> Q;
+
+		/** multi Q^-1 */
+		SGNDArray<float64_t> Q_inv;
 
 		/** task similarity matrix */
 		SGMatrix<float64_t> task_similarity_matrix;
