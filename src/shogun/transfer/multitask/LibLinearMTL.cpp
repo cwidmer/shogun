@@ -55,6 +55,8 @@ void CLibLinearMTL::init()
 	set_max_iterations();
 	epsilon=1e-5;
 
+    Q = SGMatrixList<float64_t>();
+
 	SG_ADD(&C1, "C1", "C Cost constant 1.", MS_AVAILABLE);
 	SG_ADD(&C2, "C2", "C Cost constant 2.", MS_AVAILABLE);
 	SG_ADD(&use_bias, "use_bias", "Indicates if bias is used.",

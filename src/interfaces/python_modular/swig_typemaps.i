@@ -185,6 +185,16 @@ static int is_pymatrix(PyObject* obj, int typecode)
                 )) ? 1 : 0;
 }
 
+static int is_pymatrix_list(PyObject* obj, int typecode)
+{
+    return ((obj && !PyList_Check(obj)) &&
+                (
+				 is_array(obj) &&
+                 array_dimensions(obj)==3 &&
+                 (array_type(obj) == typecode || PyArray_EquivTypenums(array_type(obj), typecode))
+                )) ? 1 : 0;
+}
+
 static int is_pyarray(PyObject* obj, int typecode)
 {
     return ((obj && !PyList_Check(obj)) &&
@@ -323,6 +333,36 @@ static bool matrix_to_numpy(PyObject* &obj, SGMatrix<type> sg_matrix, int typeco
 
     return descr!=NULL;
 }
+
+template <class type>
+static bool matrix_list_from_numpy(SGMatrixList<type>& sg_matrix_list, PyObject* obj, int typecode)
+{
+    if (!is_pymatrix(obj, typecode))
+    {
+        PyErr_SetString(PyExc_TypeError,"not a numpy matrix of appropriate type");
+        return false;
+    }
+
+    int is_new_object;
+    PyObject* array = make_contiguous(obj, &is_new_object, 3, typecode, true);
+    if (!array)
+        return false;
+
+    sg_matrix_list = shogun::SGMatrixList<type>(PyArray_DIM(array,0),
+            PyArray_DIM(array,1), PyArray_DIM(array,2), true);
+
+    for (int i=0; i!=PyArray_DIM(array,0); i++)
+    {
+        sg_matrix_list[i] = shogun::SGMatrix<type>((type*) PyArray_BYTES(array),
+            PyArray_DIM(array,1), PyArray_DIM(array,2), true);
+    }
+
+    ((PyArrayObject*) array)->flags &= (-1 ^ NPY_OWNDATA);
+    Py_DECREF(array);
+
+    return true;
+}
+
 
 template <class type>
 static bool array_from_numpy(SGNDArray<type>& sg_array, PyObject* obj, int typecode)
@@ -1053,6 +1093,42 @@ TYPEMAP_OUT_SGMATRIX(floatmax_t,    NPY_LONGDOUBLE)
 TYPEMAP_OUT_SGMATRIX(PyObject,      NPY_OBJECT)
 
 #undef TYPEMAP_OUT_SGMATRIX
+
+/* Three dimensional input arrays */
+%define TYPEMAP_IN_SGMATRIXLIST(type,typecode)
+%typemap(typecheck, precedence=SWIG_TYPECHECK_POINTER) shogun::SGMatrixList<type>
+{
+    $1 = is_pymatrix_list($input, typecode);
+}
+
+%typemap(in) shogun::SGMatrixList<type>
+{
+    if (!matrix_list_from_numpy<type>($1, $input, typecode))
+        SWIG_fail;
+}
+%enddef
+
+/* Define concrete examples of the TYPEMAP_IN_SGMATRIXLIST macros */
+TYPEMAP_IN_SGMATRIXLIST(bool,          NPY_BOOL)
+#ifdef PYTHON3 // str -> unicode for python3
+TYPEMAP_IN_SGMATRIXLIST(char,          NPY_UNICODE)
+#else
+TYPEMAP_IN_SGMATRIXLIST(char,          NPY_STRING)
+#endif
+TYPEMAP_IN_SGMATRIXLIST(uint8_t,       NPY_UINT8)
+TYPEMAP_IN_SGMATRIXLIST(int16_t,       NPY_INT16)
+TYPEMAP_IN_SGMATRIXLIST(uint16_t,      NPY_UINT16)
+TYPEMAP_IN_SGMATRIXLIST(int32_t,       NPY_INT32)
+TYPEMAP_IN_SGMATRIXLIST(uint32_t,      NPY_UINT32)
+TYPEMAP_IN_SGMATRIXLIST(int64_t,       NPY_INT64)
+TYPEMAP_IN_SGMATRIXLIST(uint64_t,      NPY_UINT64)
+TYPEMAP_IN_SGMATRIXLIST(float32_t,     NPY_FLOAT32)
+TYPEMAP_IN_SGMATRIXLIST(float64_t,     NPY_FLOAT64)
+TYPEMAP_IN_SGMATRIXLIST(floatmax_t,    NPY_LONGDOUBLE)
+TYPEMAP_IN_SGMATRIXLIST(PyObject,      NPY_OBJECT)
+
+#undef TYPEMAP_IN_SGMATRIXLIST
+
 
 /* N-dimensional input arrays */
 %define TYPEMAP_INND(type,typecode)

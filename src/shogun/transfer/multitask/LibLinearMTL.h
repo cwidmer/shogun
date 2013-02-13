@@ -20,7 +20,7 @@
 #include <shogun/base/Parameter.h>
 #include <shogun/machine/LinearMachine.h>
 #include <shogun/optimization/liblinear/shogun_liblinear.h>
-#include <shogun/lib/SGSparseMatrix.h>
+#include <shogun/lib/SGMatrixList.h>
 
 
 namespace shogun
@@ -152,6 +152,18 @@ class CLibLinearMTL : public CLinearMachine
 		}
 
 		/** set task similarity matrix */
+		inline void set_Q(SGMatrixList<float64_t> qm)
+		{
+			Q = qm;
+		}
+
+		/** set task similarity matrix */
+		inline void set_Qi(SGMatrix<float64_t> qm, int32_t idx)
+		{
+			Q[idx] = qm;
+		}
+
+		/** set task similarity matrix */
 		inline void set_task_similarity_matrix(SGMatrix<float64_t> tsm)
 		{
 			task_similarity_matrix = tsm;
@@ -276,6 +288,9 @@ class CLibLinearMTL : public CLinearMachine
 
 		/** task indicator right hand side */
 		SGVector<int32_t> task_indicator_rhs;
+
+		/** multi Q */
+		SGMatrixList<float64_t> Q;
 
 		/** task similarity matrix */
 		SGMatrix<float64_t> task_similarity_matrix;

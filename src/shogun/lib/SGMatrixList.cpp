@@ -35,6 +35,19 @@ SGMatrixList<T>::SGMatrixList(int32_t nmats, bool ref_counting)
 }
 
 template <class T>
+SGMatrixList<T>::SGMatrixList(int32_t num_mats, int32_t num_rows, int32_t num_cols, bool ref_counting)
+: SGReferencedData(ref_counting), num_matrices(num_mats)
+{
+	matrix_list = SG_MALLOC(SGMatrix<T>, num_mats);
+	// Call to SGMatrix default constructor in-place
+	for ( int32_t i = 0 ; i < num_mats ; ++i )
+    {
+		new (&matrix_list[i]) SGMatrix<T>(num_rows, num_cols, ref_counting);
+        matrix_list[i].zero();
+    }    
+}
+
+template <class T>
 SGMatrixList<T>::SGMatrixList(SGMatrixList const & orig) : SGReferencedData(orig)
 {
 	copy_data(orig);

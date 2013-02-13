@@ -25,6 +25,9 @@ template<class T> class SGMatrixList : public SGReferencedData
 		/** default constructor */
 		SGMatrixList();
 
+		/** constructor for empty tensor */
+		SGMatrixList(int32_t num_mats, int32_t num_rows, int32_t num_col, bool ref_counting = true);
+
 		/** constructor for setting parameters */
 		SGMatrixList(SGMatrix<T>* ml, int32_t nmats, bool ref_counting = true);
 
