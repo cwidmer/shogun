@@ -216,7 +216,7 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 	thetas = SGVector<float64_t>(num_kernels);
     thetas.set_const(1.0);
     thetas.scale(1.0 / thetas.qnorm(thetas.vector, num_kernels, p_norm));
-    thetas.display_vector(thetas, "thetas");
+    thetas.display_vector(thetas, "thetas", "init");
 
 	// default solver_type: L2R_L2LOSS_SVC_DUAL
 	double diag[3] = {0.5/Cn, 0, 0.5/Cp};
@@ -355,25 +355,28 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 
         for (int32_t m=0; m!=num_kernels; m++)
         {
+            Q_inv[m].display_matrix(Q_inv[m], "Q_inv", "Q_inv");
             float64_t norm_wm = 0;
             for (int32_t k=0; k!=num_tasks; k++)
             {
                 float64_t* w_k = W[m].get_column_vector(k);
                 for (int32_t t=0; t!=num_tasks; t++)
                 {
+                    std::cout << "Q_inv[m,s,t] " << Q_inv[m](k,t) << ", m=" << m << std::endl;
                     float64_t* w_t = W[m].get_column_vector(t);
                     for (int32_t i=0; i!=w_size; i++)
                     {
-                        norm_wm += Q_inv[m](s,t) * w_k[i] * w_t[i];
+                        norm_wm += Q_inv[m](k,t) * w_k[i] * w_t[i];
                     }
                 }
             }
+            std::cout << "norm_wm: " << norm_wm << std::endl;
             thetas[m] = CMath::pow(norm_wm, 1.0/(p_norm+1));
         }
  
         // normalize to p-norm
         thetas.scale(1.0 / thetas.qnorm(thetas.vector, num_kernels, p_norm));
-        thetas.display_vector(thetas, "thetas");
+        thetas.display_vector(thetas, "thetas", "update");
 
 		iter++;
 		float64_t gap=PGmax_new - PGmin_new;
@@ -460,12 +463,13 @@ return obj
 
 	SG_INFO("DONE to compute Primal OBJ\n")
 	// calculate objective value
-	SGMatrix<float64_t> W = get_W()[0]; //TODO: update to tensor
+	SGMatrixList<float64_t> W = get_W();
 
 	float64_t obj = 0;
 	int32_t num_vec = features->get_num_vectors();
 	int32_t w_size = features->get_dim_feature_space();
 
+    /*
 	// L2 regularizer
 	for (int32_t t=0; t<num_tasks; t++)
 	{
@@ -476,29 +480,37 @@ return obj
 			obj += 0.5 * w_t[i]*w_t[i];
 		}
 	}
-
+    */
+    
 	// MTL regularizer
-	for (int32_t s=0; s<num_tasks; s++)
-	{
-		float64_t* w_s = W.get_column_vector(s);
-		for (int32_t t=0; t<num_tasks; t++)
-		{
-			float64_t* w_t = W.get_column_vector(t);
-			float64_t l = Q[0](s,t);
+    for (int32_t m=0; m<num_kernels; m++)
+    {
+        for (int32_t s=0; s<num_tasks; s++)
+        {
+            float64_t* w_s = W[m].get_column_vector(s);
+            for (int32_t t=0; t<num_tasks; t++)
+            {
+                float64_t* w_t = W[m].get_column_vector(t);
+                float64_t l = Q[m](s,t) / thetas[m];
 
-			for(int32_t i=0; i<w_size; i++)
-			{
-				obj += 0.5 * l * w_s[i]*w_t[i];
-			}
-		}
-	}
+                for(int32_t i=0; i<w_size; i++)
+                {
+                    obj += 0.5 * l * w_s[i]*w_t[i];
+                }
+            }
+        }
+    }
 
 	// loss
 	for(int32_t i=0; i<num_vec; i++)
 	{
 		int32_t ti = task_indicator_lhs[i];
-		float64_t* w_t = W.get_column_vector(ti);
-		float64_t residual = ((CBinaryLabels*)m_labels)->get_label(i) * features->dense_dot(i, w_t, w_size);
+        float64_t residual = 0;
+        for (int32_t m=0; m<num_kernels; m++)
+        {
+		    float64_t* w_t = W[m].get_column_vector(ti);
+		    residual += ((CBinaryLabels*)m_labels)->get_label(i) * features->dense_dot(i, w_t, w_size);
+        }
 
 		// hinge loss
 		obj += C1 * CMath::max(0.0, 1 - residual);
