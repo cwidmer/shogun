@@ -191,7 +191,7 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 
 	int l = prob->l;
 	int w_size = prob->n;
-	int i, s, iter = 0;
+	int s, iter = 0;
 	double C, d, G;
 	double *QD = SG_MALLOC(double, l);
 	int *index = SG_MALLOC(int, l);
@@ -215,7 +215,7 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
     // thetas
 	thetas = SGVector<float64_t>(num_kernels);
     thetas.set_const(1.0);
-    thetas.scale(1.0 / thetas.qnorm(p_norm));
+    thetas.scale(1.0 / thetas.qnorm(thetas.vector, num_kernels, p_norm));
 
 	// default solver_type: L2R_L2LOSS_SVC_DUAL
 	double diag[3] = {0.5/Cn, 0, 0.5/Cp};
@@ -234,7 +234,7 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 		n--;
 
 
-	for(i=0; i<l; i++)
+	for(int i=0; i<l; i++)
 	{
 		if(prob->y[i] > 0)
 		{
@@ -258,7 +258,7 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 		PGmax_new = -CMath::INFTY;
 		PGmin_new = CMath::INFTY;
 
-		for (i=0; i<active_size; i++)
+		for (int i=0; i<active_size; i++)
 		{
 			int j = i+rand()%(active_size-i);
 			CMath::swap(index[i], index[j]);
@@ -266,7 +266,7 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 
 		for (s=0;s<active_size;s++)
 		{
-			i = index[s];
+			int32_t i = index[s];
 			int32_t yi = y[i];
 			int32_t ti = task_indicator_lhs[i];
 			C = upper_bound[GETI(i)];
@@ -350,26 +350,28 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 
         //TODO fetch W from V
         // theta update
+        SGMatrixList<float64_t> W = get_W();
+
         for (int32_t m=0; m!=num_kernels; m++)
         {
             float64_t norm_wm = 0;
-            for (int32_t s=0; s!=num_tasks; s++)
+            for (int32_t k=0; k!=num_tasks; k++)
             {
-                float64_t* v_s = V[m].get_column_vector(s);
+                float64_t* w_k = W[m].get_column_vector(k);
                 for (int32_t t=0; t!=num_tasks; t++)
                 {
-                    float64_t* v_t = V[m].get_column_vector(t);
+                    float64_t* w_t = W[m].get_column_vector(t);
                     for (int32_t i=0; i!=w_size; i++)
                     {
-                        norm_wm += Q_inv[m](s,t) * v_s[i] * v_t[i];
+                        norm_wm += Q_inv[m](s,t) * w_k[i] * w_t[i];
                     }
                 }
             }
             thetas[m] = CMath::pow(norm_wm, 1.0/(p_norm+1));
         }
  
-        // normalize to p-norm 1
-        thetas.scale(1.0 / thetas.qnorm(p_norm));
+        // normalize to p-norm
+        thetas.scale(1.0 / thetas.qnorm(thetas.vector, num_kernels, p_norm));
 
 		iter++;
 		float64_t gap=PGmax_new - PGmin_new;
@@ -456,7 +458,7 @@ return obj
 
 	SG_INFO("DONE to compute Primal OBJ\n")
 	// calculate objective value
-	SGMatrix<float64_t> W = get_W();
+	SGMatrix<float64_t> W = get_W()[0]; //TODO: update to tensor
 
 	float64_t obj = 0;
 	int32_t num_vec = features->get_num_vectors();

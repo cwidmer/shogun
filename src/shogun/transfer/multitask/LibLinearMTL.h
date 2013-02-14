@@ -41,13 +41,12 @@ class CLibLinearMTL : public CLinearMachine
 		/** constructor (using L2R_L1LOSS_SVC_DUAL as default)
 		 *
 		 * @param C constant C
-		 * @param num_kernels number of kernels (in MT-MKL setting)
-		 * @param num_tasks number of tasks (in MT-MKL setting)
 		 * @param traindat training features
 		 * @param trainlab training labels
 		 */
 		CLibLinearMTL(
-			float64_t C, CDotFeatures* traindat, CLabels* trainlab);
+			float64_t C, CDotFeatures* traindat,
+			CLabels* trainlab);
 
 		/** destructor */
 		virtual ~CLibLinearMTL();
@@ -190,26 +189,25 @@ class CLibLinearMTL : public CLinearMachine
 		 *
 		 * @return matrix of weight vectors
 		 */
-		inline SGMatrix<float64_t> get_W()
+		inline SGMatrixList<float64_t> get_W()
 		{
             
             int32_t w_size = V[0].num_rows;
 
-            SGMatrix<float64_t> W = SGMatrix<float64_t>(w_size, num_tasks);
-            for(int32_t k=0; k<w_size*num_tasks; k++) 
+            SGMatrixList<float64_t> W = SGMatrixList<float64_t>(num_kernels, w_size, num_tasks);
+            for (int32_t m=0; m<num_kernels; m++)
             {
-                W.matrix[k] = 0;
-            }
-
-            for (int32_t s=0; s<num_tasks; s++)
-            {
-                float64_t* v_s = V[0].get_column_vector(s);
-                for (int32_t t=0; t<num_tasks; t++)
+                for (int32_t s=0; s<num_tasks; s++)
                 {
-                    float64_t sim_ts = Q_inv[0](s,t);
-                    for(int32_t i=0; i<w_size; i++)
+                    float64_t* v_s = V[m].get_column_vector(s);
+                    for (int32_t t=0; t<num_tasks; t++)
                     {
-                        W.matrix[t*w_size + i] += sim_ts * v_s[i];
+                        float64_t sim_st = thetas[m] * Q_inv[m](s,t); //TODO check if Q_inv is correct
+                        for(int32_t i=0; i<w_size; i++)
+                        {
+                            //W[m].matrix[t*w_size + i] += sim_ts * v_s[i];
+                            W[m](i,t) += sim_st * v_s[i];
+                        }
                     }
                 }
             }
@@ -286,7 +284,7 @@ class CLibLinearMTL : public CLinearMachine
         SGVector<float64_t> thetas;
 
 		/** p-norm for MKL */
-        int32_t p_norm;
+        float64_t p_norm;
 
 		/** set number of tasks */
         int32_t num_tasks;
