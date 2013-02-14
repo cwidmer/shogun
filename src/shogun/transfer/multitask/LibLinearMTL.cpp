@@ -333,7 +333,7 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 			{   
 
                 // update distance
-				d = -G/QD[i]; // should be (QD[i] * sum(thetas)), but sum always 1
+				d = -G/(QD[i] * thetas.sum(thetas));
 
                 std::cout << "d: " << d << std::endl;
 				// save previous alpha
@@ -343,7 +343,7 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 				alphas[i] = CMath::max(0.0, CMath::min(C, alphas[i] + d));
 
                 // clipped d
-                double clip_d = alphas[i] - alpha_old;
+                double clip_d = (alphas[i] - alpha_old) * yi;
 
 				// update corresponding weight vector
     			for (int32_t m=0; m!=num_kernels; m++)
