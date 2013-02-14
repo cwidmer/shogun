@@ -216,7 +216,6 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 	thetas = SGVector<float64_t>(num_kernels);
     thetas.set_const(1.0);
     thetas.scale(1.0 / thetas.qnorm(thetas.vector, num_kernels, p_norm));
-    thetas.display_vector(thetas, "thetas", "init");
 
 	// default solver_type: L2R_L2LOSS_SVC_DUAL
 	double diag[3] = {0.5/Cn, 0, 0.5/Cp};
@@ -256,8 +255,6 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 		if (m_max_train_time > 0 && start_time.cur_time_diff() > m_max_train_time)
 			break;
 
-        std::cout << "iteration: " << iter << std::endl;
-
 		PGmax_new = -CMath::INFTY;
 		PGmin_new = CMath::INFTY;
 
@@ -293,8 +290,6 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 			// compute gradient
 			G = inner_sum-1.0;
 
-            std::cout << "G: " << G << std::endl;
-
 			// check if point can be removed from active set
 			PG = 0;
 			if (alphas[i] == 0)
@@ -324,7 +319,6 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 			else
 				PG = G;
 
-            std::cout << "PG: " << PG << std::endl;
 
 			PGmax_new = CMath::max(PGmax_new, PG);
 			PGmin_new = CMath::min(PGmin_new, PG);
@@ -335,7 +329,6 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
                 // update distance
 				d = -G/(QD[i] * thetas.sum(thetas));
 
-                std::cout << "d: " << d << std::endl;
 				// save previous alpha
 				double alpha_old = alphas[i];
 
@@ -357,21 +350,17 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 			}
 		}
 
-        //TODO fetch W from V
         // theta update
-        /*
         SGMatrixList<float64_t> W = get_W();
 
         for (int32_t m=0; m!=num_kernels; m++)
         {
-            Q_inv[m].display_matrix(Q_inv[m], "Q_inv", "Q_inv");
             float64_t norm_wm = 0;
             for (int32_t k=0; k!=num_tasks; k++)
             {
                 float64_t* w_k = W[m].get_column_vector(k);
                 for (int32_t t=0; t!=num_tasks; t++)
                 {
-                    std::cout << "Q_inv[m,s,t] " << Q_inv[m](k,t) << ", m=" << m << std::endl;
                     float64_t* w_t = W[m].get_column_vector(t);
                     for (int32_t i=0; i!=w_size; i++)
                     {
@@ -379,14 +368,11 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
                     }
                 }
             }
-            std::cout << "norm_wm: " << norm_wm << std::endl;
             thetas[m] = CMath::pow(norm_wm, 1.0/(p_norm+1));
         }
  
         // normalize to p-norm
         thetas.scale(1.0 / thetas.qnorm(thetas.vector, num_kernels, p_norm));
-        thetas.display_vector(thetas, "thetas", "update");
-        */
 
 		iter++;
 		float64_t gap=PGmax_new - PGmin_new;
