@@ -312,6 +312,12 @@ class CLibLinearMTL : public CLinearMachine
 		 */
 		virtual float64_t compute_dual_obj();
 
+		/** compute dual objective
+		 *
+		 * @return dual objective
+		 */
+		virtual float64_t compute_dual_obj_alphas();
+
 		/** compute duality gap
 		 *
 		 * @return duality gap

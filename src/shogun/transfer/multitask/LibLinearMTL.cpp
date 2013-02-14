@@ -534,20 +534,6 @@ return obj
 
 float64_t CLibLinearMTL::compute_dual_obj()
 {
-	/* python prototype
-	   num_xt = len(xt)
-
-# compute quadratic term
-for i in xrange(num_xt):
-for j in xrange(num_xt):
-
-s = task_indicator[i]
-t = task_indicator[j]
-
-obj -= 0.5 * M[s,t] * alphas[i] * alphas[j] * lt[i] * lt[j] * np.dot(xt[i], xt[j])
-
-return obj
-*/
 
 	SG_INFO("starting to compute DUAL OBJ\n")
 
@@ -563,7 +549,6 @@ return obj
 
 	// compute quadratic term
 
-    std::cout << "objective after alphas:" << obj << std::endl;
 
 	int32_t v_size = features->get_dim_feature_space();
 
@@ -588,7 +573,6 @@ return obj
                 }
             }
         }
-        std::cout << "quad[m]:" << quad[m] << std::endl;
 
     }
 
@@ -596,14 +580,32 @@ return obj
     // http://jmlr.csail.mit.edu/papers/volume12/kloft11a/kloft11a.pdf
 
     float64_t p_star = p_norm / (p_norm - 1);
-    std::cout << "p_star:" << p_star << std::endl;
     obj -= 0.5 * quad.qnorm(quad.vector, num_kernels, p_star);
 
+    return obj;
+}
 
-	/*
+float64_t CLibLinearMTL::compute_dual_obj_alphas()
+{
+
+	SG_INFO("starting to compute DUAL OBJ\n");
+
+	int32_t num_vec=features->get_num_vectors();
+
+	float64_t obj = 0;
+
+	// compute linear term
+	for(int32_t i=0; i<num_vec; i++)
+	{
+		obj += alphas[i];
+	}
+
+	// compute quadratic term
+
+    SGVector<float64_t> quad = SGVector<float64_t>(num_kernels);
+    quad.zero();
+
 	// naiive implementation
-	float64_t tmp_val2 = 0;
-
 	for(int32_t i=0; i<num_vec; i++)
 	{
 		int32_t ti_i = task_indicator_lhs[i];
@@ -612,15 +614,18 @@ return obj
 			// look up task similarity
 			int32_t ti_j = task_indicator_lhs[j];
 
-			const float64_t ts = task_similarity_matrix(ti_i, ti_j);
-
-			// compute objective
-			tmp_val2 -= 0.5 * alphas[i] * alphas[j] * ts * ((CBinaryLabels*)m_labels)->get_label(i) * 
+        	for(int32_t m=0; m<num_kernels; m++)
+        	{
+			    const float64_t ts = Q_inv[m](ti_i, ti_j);
+			    // compute objective
+    			quad[m] += ts * alphas[i] * alphas[j] * ((CBinaryLabels*)m_labels)->get_label(i) * 
 				((CBinaryLabels*)m_labels)->get_label(j) * features->dot(i, features,j);
+            }
 		}
 	}
-	*/
 
+    float64_t p_star = p_norm / (p_norm - 1);
+    obj -= 0.5 * quad.qnorm(quad.vector, num_kernels, p_star);
 
 	return obj;
 }
