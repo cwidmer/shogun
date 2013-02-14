@@ -159,21 +159,36 @@ class CLibLinearMTL : public CLinearMachine
 		}
 
 		/** set Q */
-		inline void set_Q(int32_t nk, int32_t nt)
+		inline void setup_Q(int32_t nk, int32_t nt)
 		{
-            Q = SGMatrixList<float64_t>(nk, nt, nt);
+            num_kernels = nk;
+            num_tasks = nt;
+            Q = SGMatrixList<float64_t>(num_kernels, num_tasks, num_tasks);
+            Q_inv = SGMatrixList<float64_t>(num_kernels, num_tasks, num_tasks);
 		}
 
-		/** get Q */
+		/** get Q[idx] */
 		inline SGMatrix<float64_t> get_Qi(int32_t idx)
 		{
 			return Q[idx];
 		}
 
-		/** set task similarity matrix */
+		/** set Q[idx] */
 		inline void set_Qi(SGMatrix<float64_t> qm, int32_t idx)
 		{
 			Q[idx] = qm;
+		}
+
+		/** get Q_inv[idx] */
+		inline SGMatrix<float64_t> get_Q_inv_i(int32_t idx)
+		{
+			return Q_inv[idx];
+		}
+
+		/** set Q_inv[idx] */
+		inline void set_Q_inv_i(SGMatrix<float64_t> qm, int32_t idx)
+		{
+			Q_inv[idx] = qm;
 		}
 
 		/** get V
