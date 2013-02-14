@@ -4,7 +4,7 @@
  * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
- * Written (W) 2011-2012 Christian Widmer
+ * Written (W) 2011-2013 Christian Widmer
  * Written (W) 2007-2010 Soeren Sonnenburg
  * Copyright (c) 2007-2009 The LIBLINEAR Project.
  * Copyright (C) 2007-2013 Fraunhofer FIRST, MPG, TU-Berlin, MSKCC
@@ -39,7 +39,8 @@ CLibLinearMTL::CLibLinearMTL(
 	init();
 	C1=C;
 	C2=C;
-	use_bias=true;
+    
+	use_bias=false;
 
 	set_features(traindat);
 	set_labels(trainlab);
@@ -52,6 +53,8 @@ void CLibLinearMTL::init()
 	use_bias=false;
 	C1=1;
 	C2=1;
+    num_kernels=1;
+    num_tasks=1;
 	set_max_iterations();
 	epsilon=1e-5;
 
@@ -202,12 +205,17 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 	double PGmin_old = -CMath::INFTY;
 	double PGmax_new, PGmin_new;
 
-	// matrix W
-	V = SGMatrix<float64_t>(w_size,num_tasks);
+	// matrix V (d x num_tasks)
+	V = SGMatrixList<float64_t>(num_kernels,w_size,num_tasks);
 
-	// save alpha
+	// alpha 
 	alphas = SGVector<float64_t>(l);
+    alphas.zero();
 
+    // thetas
+	thetas = SGVector<float64_t>(num_kernels);
+    thetas.set_const(1.0);
+    thetas.scale(1.0 / thetas.qnorm(p_norm));
 
 	// default solver_type: L2R_L2LOSS_SVC_DUAL
 	double diag[3] = {0.5/Cn, 0, 0.5/Cp};
@@ -225,17 +233,6 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 	if (prob->use_bias)
 		n--;
 
-	// set V to zero
-	for(int32_t k=0; k<w_size*num_tasks; k++) 
-	{
-		V.matrix[k] = 0;
-	}
-
-	// init alphas
-	for(i=0; i<l; i++)
-	{
-		alphas[i] = 0;
-	}
 
 	for(i=0; i<l; i++)
 	{
@@ -276,20 +273,20 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 
 			// we compute the inner sum by looping over tasks
 			// this update is the main result of MTL_DCD
-		    typedef std::map<index_t, float64_t>::const_iterator map_iter;
-
 			float64_t inner_sum = 0;
-			for (int32_t k=0; k!=num_tasks; k++)
-			{
-				//inner_sum += M[t,ti] * all_lt[i] * np.dot(V[t,:], all_xt[i])
-				float64_t* tmp_w = V.get_column_vector(k);
-				inner_sum += task_similarity_matrix.matrix[k*num_tasks+ti] * yi * prob->x->dense_dot(i, tmp_w, n);
+			for (int32_t m=0; m!=num_kernels; m++)
+            {
+                for (int32_t k=0; k!=num_tasks; k++)
+                {
+                    //inner_sum += M[t,ti] * all_lt[i] * np.dot(V[t,:], all_xt[i])
+                    float64_t* v_k = V[m].get_column_vector(k);
+                    inner_sum += thetas[m] * Q_inv[m](k,ti) * yi * prob->x->dense_dot(i, v_k, n);
 
-				//possibly deal with bias
-				//if (prob->use_bias)
-				//	G+=w[n];
-			}
-
+                    //possibly deal with bias
+                    //if (prob->use_bias)
+                    //	G+=w[n];
+                }
+            }
 			// compute gradient
 			G = inner_sum-1.0;
 
@@ -327,22 +324,52 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 
 			if(fabs(PG) > 1.0e-12)
 			{   
+                // update distance
+				d = -G/QD[i]; // should be (QD[i] * sum(thetas)), but sum always 1
+
 				// save previous alpha
 				double alpha_old = alphas[i];
 
 				// project onto feasible set
-				alphas[i] = CMath::min(CMath::max(alphas[i] - G/QD[i], 0.0), C);
-				d = (alphas[i] - alpha_old)*yi;
+				alphas[i] = CMath::max(0.0, CMath::min(C, alphas[i] + d));
+
+                // clipped d
+                double clip_d = alphas[i] - alpha_old;
 
 				// update corresponding weight vector
-				float64_t* tmp_w = V.get_column_vector(ti);
-				prob->x->add_to_dense_vec(d, i, tmp_w, n);
-
+    			for (int32_t m=0; m!=num_kernels; m++)
+                {
+    				float64_t* v = V[m].get_column_vector(ti);
+	    			prob->x->add_to_dense_vec(clip_d, i, v, n);
+                }
 
 				//if (prob->use_bias)
 				//	w[n]+=d;
 			}
 		}
+
+        //TODO fetch W from V
+        // theta update
+        for (int32_t m=0; m!=num_kernels; m++)
+        {
+            float64_t norm_wm = 0;
+            for (int32_t s=0; s!=num_tasks; s++)
+            {
+                float64_t* v_s = V[m].get_column_vector(s);
+                for (int32_t t=0; t!=num_tasks; t++)
+                {
+                    float64_t* v_t = V[m].get_column_vector(t);
+                    for (int32_t i=0; i!=w_size; i++)
+                    {
+                        norm_wm += Q_inv[m](s,t) * v_s[i] * v_t[i];
+                    }
+                }
+            }
+            thetas[m] = CMath::pow(norm_wm, 1.0/(p_norm+1));
+        }
+ 
+        // normalize to p-norm 1
+        thetas.scale(1.0 / thetas.qnorm(p_norm));
 
 		iter++;
 		float64_t gap=PGmax_new - PGmin_new;
@@ -453,7 +480,7 @@ return obj
 		for (int32_t t=0; t<num_tasks; t++)
 		{
 			float64_t* w_t = W.get_column_vector(t);
-			float64_t l = graph_laplacian.matrix[s*num_tasks+t];
+			float64_t l = Q[0](s,t);
 
 			for(int32_t i=0; i<w_size; i++)
 			{
@@ -515,11 +542,11 @@ return obj
 	// efficient computation
 	for (int32_t s=0; s<num_tasks; s++)
 	{
-		float64_t* v_s = V.get_column_vector(s);
+		float64_t* v_s = V[0].get_column_vector(s);
 		for (int32_t t=0; t<num_tasks; t++)
 		{
-			float64_t* v_t = V.get_column_vector(t);
-			const float64_t ts = task_similarity_matrix(s, t);
+			float64_t* v_t = V[0].get_column_vector(t);
+			const float64_t ts = Q[0](s, t);
 
 			for(int32_t i=0; i<v_size; i++)
 			{

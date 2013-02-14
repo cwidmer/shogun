@@ -22,7 +22,7 @@
 #include <shogun/optimization/liblinear/shogun_liblinear.h>
 #include <shogun/lib/SGMatrixList.h>
 #include <shogun/lib/SGNDArray.h>
-
+#include <iostream>
 
 namespace shogun
 {
@@ -41,12 +41,13 @@ class CLibLinearMTL : public CLinearMachine
 		/** constructor (using L2R_L1LOSS_SVC_DUAL as default)
 		 *
 		 * @param C constant C
+		 * @param num_kernels number of kernels (in MT-MKL setting)
+		 * @param num_tasks number of tasks (in MT-MKL setting)
 		 * @param traindat training features
 		 * @param trainlab training labels
 		 */
 		CLibLinearMTL(
-			float64_t C, CDotFeatures* traindat,
-			CLabels* trainlab);
+			float64_t C, CDotFeatures* traindat, CLabels* trainlab);
 
 		/** destructor */
 		virtual ~CLibLinearMTL();
@@ -116,6 +117,12 @@ class CLibLinearMTL : public CLinearMachine
 			max_iterations=max_iter;
 		}
 
+		/** set number of kernels */
+		inline void set_num_kernels(int32_t nk)
+		{
+			num_kernels = nk;
+		}
+
 		/** set number of tasks */
 		inline void set_num_tasks(int32_t nt)
 		{
@@ -153,21 +160,9 @@ class CLibLinearMTL : public CLinearMachine
 		}
 
 		/** set Q */
-		inline void set_Q(SGMatrixList<float64_t> qm)
+		inline void set_Q(int32_t nk, int32_t nt)
 		{
-            Q = qm;
-		}
-
-		/** set Q */
-		inline void set_Q2(SGNDArray<float64_t> qm)
-		{
-            Q = SGMatrixList<float64_t>(qm.dims[0], qm.dims[1], qm.dims[2]);
-            //Q = SGMatrixList<float64_t>();
-            
-            for (int32_t i=0; i!=qm.dims[0]; i++)
-            {
-                Q[i] = SGMatrix<float64_t>(qm.get_matrix(i), qm.dims[1], qm.dims[2]);
-            }
+            Q = SGMatrixList<float64_t>(nk, nt, nt);
 		}
 
 		/** get Q */
@@ -182,35 +177,11 @@ class CLibLinearMTL : public CLinearMachine
 			Q[idx] = qm;
 		}
 
-		/** get Q_inv */
-		inline SGNDArray<float64_t> get_Q_inv()
-		{
-			return Q_inv;
-		}
-
-		/** set Q_inv */
-		inline void set_Q_inv(SGNDArray<float64_t> qm)
-		{
-			Q_inv = qm;
-		}
-
-		/** set task similarity matrix */
-		inline void set_task_similarity_matrix(SGMatrix<float64_t> tsm)
-		{
-			task_similarity_matrix = tsm;
-		}
-
-		/** set graph laplacian */
-		inline void set_graph_laplacian(SGMatrix<float64_t> lap)
-		{
-			graph_laplacian = lap;
-		}
-
 		/** get V
 		 *
 		 * @return matrix of weight vectors
 		 */
-		inline SGMatrix<float64_t> get_V()
+		inline SGMatrixList<float64_t> get_V()
 		{
 			return V;
 		}
@@ -222,7 +193,7 @@ class CLibLinearMTL : public CLinearMachine
 		inline SGMatrix<float64_t> get_W()
 		{
             
-            int32_t w_size = V.num_rows;
+            int32_t w_size = V[0].num_rows;
 
             SGMatrix<float64_t> W = SGMatrix<float64_t>(w_size, num_tasks);
             for(int32_t k=0; k<w_size*num_tasks; k++) 
@@ -232,10 +203,10 @@ class CLibLinearMTL : public CLinearMachine
 
             for (int32_t s=0; s<num_tasks; s++)
             {
-                float64_t* v_s = V.get_column_vector(s);
+                float64_t* v_s = V[0].get_column_vector(s);
                 for (int32_t t=0; t<num_tasks; t++)
                 {
-                    float64_t sim_ts = task_similarity_matrix(s,t);
+                    float64_t sim_ts = Q_inv[0](s,t);
                     for(int32_t i=0; i<w_size; i++)
                     {
                         W.matrix[t*w_size + i] += sim_ts * v_s[i];
@@ -311,8 +282,17 @@ class CLibLinearMTL : public CLinearMachine
 		/** keep track of alphas */
 		SGVector<float64_t> alphas;
 
+        /** vector of MKL variables */
+        SGVector<float64_t> thetas;
+
+		/** p-norm for MKL */
+        int32_t p_norm;
+
 		/** set number of tasks */
         int32_t num_tasks;
+
+		/** set number of kernels */
+        int32_t num_kernels;
 
 		/** task indicator left hand side */
 		SGVector<int32_t> task_indicator_lhs;
@@ -324,16 +304,10 @@ class CLibLinearMTL : public CLinearMachine
 		SGMatrixList<float64_t> Q;
 
 		/** multi Q^-1 */
-		SGNDArray<float64_t> Q_inv;
-
-		/** task similarity matrix */
-		SGMatrix<float64_t> task_similarity_matrix;
-
-		/** task similarity matrix */
-		SGMatrix<float64_t> graph_laplacian;
+		SGMatrixList<float64_t> Q_inv;
 
 		/** parameter matrix n * d */
-		SGMatrix<float64_t> V;
+		SGMatrixList<float64_t> V;
 
         /** duality gap */
         float64_t duality_gap;
