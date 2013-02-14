@@ -216,6 +216,7 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 	thetas = SGVector<float64_t>(num_kernels);
     thetas.set_const(1.0);
     thetas.scale(1.0 / thetas.qnorm(thetas.vector, num_kernels, p_norm));
+    thetas.display_vector(thetas, "thetas");
 
 	// default solver_type: L2R_L2LOSS_SVC_DUAL
 	double diag[3] = {0.5/Cn, 0, 0.5/Cp};
@@ -372,6 +373,7 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
  
         // normalize to p-norm
         thetas.scale(1.0 / thetas.qnorm(thetas.vector, num_kernels, p_norm));
+        thetas.display_vector(thetas, "thetas");
 
 		iter++;
 		float64_t gap=PGmax_new - PGmin_new;
@@ -548,7 +550,7 @@ return obj
 		for (int32_t t=0; t<num_tasks; t++)
 		{
 			float64_t* v_t = V[0].get_column_vector(t);
-			const float64_t ts = Q[0](s, t);
+			const float64_t ts = Q_inv[0](s, t);
 
 			for(int32_t i=0; i<v_size; i++)
 			{

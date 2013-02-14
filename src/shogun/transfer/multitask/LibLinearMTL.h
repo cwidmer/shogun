@@ -128,6 +128,30 @@ class CLibLinearMTL : public CLinearMachine
 			num_tasks = nt;
 		}
 
+		/** set p_norm */
+		inline void set_p_norm(float64_t pn)
+		{
+			p_norm = pn;
+		}
+
+		/** get p_norm */
+		inline float64_t get_p_norm(float64_t pn)
+		{
+			return p_norm;
+		}
+
+		/** set thetas */
+		inline void set_thetas(SGVector<float64_t> t)
+		{
+			thetas = t;
+		}
+
+		/** get thetas */
+		inline SGVector<float64_t> get_thetas()
+		{
+			return thetas;
+		}
+
 		/** set the linear term for qp */
 		inline void set_linear_term(SGVector<float64_t> linear_term)
 		{
@@ -228,6 +252,43 @@ class CLibLinearMTL : public CLinearMachine
             }
 
 			return W;
+		}
+
+		/** get V_m
+		 *
+		 * @return matrix of working vectors for kernel m
+		 */
+		inline SGMatrix<float64_t> get_Vm(int32_t m)
+		{
+            return V[m];
+        }
+
+		/** get W_m
+		 *
+		 * @return matrix of weight vector for kernel m
+		 */
+		inline SGMatrix<float64_t> get_Wm(int32_t m)
+		{
+            
+            int32_t w_size = V[0].num_rows;
+
+            SGMatrix<float64_t> Wm = SGMatrix<float64_t>(w_size, num_tasks);
+            Wm.zero();
+
+            for (int32_t s=0; s<num_tasks; s++)
+            {
+                float64_t* v_s = V[m].get_column_vector(s);
+                for (int32_t t=0; t<num_tasks; t++)
+                {
+                    float64_t sim_st = thetas[m] * Q_inv[m](s,t);
+                    for(int32_t i=0; i<w_size; i++)
+                    {
+                        Wm(i,t) += sim_st * v_s[i];
+                    }
+                }
+            }
+
+			return Wm;
 		}
 
 		/** get alphas
