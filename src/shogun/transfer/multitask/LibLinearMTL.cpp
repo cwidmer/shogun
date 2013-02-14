@@ -256,6 +256,8 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 		if (m_max_train_time > 0 && start_time.cur_time_diff() > m_max_train_time)
 			break;
 
+        std::cout << "iteration: " << iter << std::endl;
+
 		PGmax_new = -CMath::INFTY;
 		PGmin_new = CMath::INFTY;
 
@@ -291,6 +293,8 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 			// compute gradient
 			G = inner_sum-1.0;
 
+            std::cout << "G: " << G << std::endl;
+
 			// check if point can be removed from active set
 			PG = 0;
 			if (alphas[i] == 0)
@@ -320,14 +324,18 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 			else
 				PG = G;
 
+            std::cout << "PG: " << PG << std::endl;
+
 			PGmax_new = CMath::max(PGmax_new, PG);
 			PGmin_new = CMath::min(PGmin_new, PG);
 
 			if(fabs(PG) > 1.0e-12)
 			{   
+
                 // update distance
 				d = -G/QD[i]; // should be (QD[i] * sum(thetas)), but sum always 1
 
+                std::cout << "d: " << d << std::endl;
 				// save previous alpha
 				double alpha_old = alphas[i];
 
@@ -351,6 +359,7 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 
         //TODO fetch W from V
         // theta update
+        /*
         SGMatrixList<float64_t> W = get_W();
 
         for (int32_t m=0; m!=num_kernels; m++)
@@ -377,6 +386,7 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
         // normalize to p-norm
         thetas.scale(1.0 / thetas.qnorm(thetas.vector, num_kernels, p_norm));
         thetas.display_vector(thetas, "thetas", "update");
+        */
 
 		iter++;
 		float64_t gap=PGmax_new - PGmin_new;
@@ -553,23 +563,42 @@ return obj
 
 	// compute quadratic term
 
+    std::cout << "objective after alphas:" << obj << std::endl;
+
 	int32_t v_size = features->get_dim_feature_space();
 
-	// efficient computation
-	for (int32_t s=0; s<num_tasks; s++)
-	{
-		float64_t* v_s = V[0].get_column_vector(s);
-		for (int32_t t=0; t<num_tasks; t++)
-		{
-			float64_t* v_t = V[0].get_column_vector(t);
-			const float64_t ts = Q_inv[0](s, t);
 
-			for(int32_t i=0; i<v_size; i++)
-			{
-				obj -= 0.5 * ts * v_s[i]*v_t[i];
-			}
-		}
-	}
+    SGVector<float64_t> quad = SGVector<float64_t>(num_kernels);
+    quad.zero();
+
+	// efficient computation
+    for (int32_t m=0; m<num_kernels; m++)
+    {
+        for (int32_t s=0; s<num_tasks; s++)
+        {
+            float64_t* v_s = V[m].get_column_vector(s);
+            for (int32_t t=0; t<num_tasks; t++)
+            {
+                float64_t* v_t = V[m].get_column_vector(t);
+                const float64_t ts = Q_inv[m](s, t);
+
+                for(int32_t i=0; i<v_size; i++)
+                {
+                    quad[m] += ts * v_s[i]*v_t[i];
+                }
+            }
+        }
+        std::cout << "quad[m]:" << quad[m] << std::endl;
+
+    }
+
+    // setup calculation of norm according to
+    // http://jmlr.csail.mit.edu/papers/volume12/kloft11a/kloft11a.pdf
+
+    float64_t p_star = p_norm / (p_norm - 1);
+    std::cout << "p_star:" << p_star << std::endl;
+    obj -= 0.5 * quad.qnorm(quad.vector, num_kernels, p_star);
+
 
 	/*
 	// naiive implementation
