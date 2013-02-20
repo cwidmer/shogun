@@ -351,7 +351,7 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 		}
 
         // theta update
-        SGMatrixList<float64_t> W = get_W();
+        W = get_W();
 
         for (int32_t m=0; m!=num_kernels; m++)
         {
@@ -406,7 +406,8 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 				"(also see liblinear FAQ)\n\n");
 	}
 
-
+    // store final parameter vectors
+    W = get_W();
 
 	delete [] QD;
 	//delete [] alpha;

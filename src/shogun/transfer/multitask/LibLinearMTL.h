@@ -89,6 +89,39 @@ class CLibLinearMTL : public CLinearMachine
 		 */
 		inline float64_t get_epsilon() { return epsilon; }
 
+		/** set m_current_task
+		 *
+		 * @param ct new m_current_task
+		 */
+		inline void set_m_current_task(float64_t ct) 
+		{ 
+			m_current_task=ct;
+
+			int32_t w_size = V[0].num_rows;
+
+            W = get_W();
+            w.zero();
+
+            for (int32_t m=0; m!=num_kernels; m++)
+            {
+                float64_t* tmp_w = W[m].get_column_vector(ct);
+                for (int32_t i=0; i!=w_size; i++)
+                {
+                    w[i] += thetas[m] * tmp_w[i];
+                }
+            }
+
+	        SG_INFO("current task updated, active w rewritten\n");
+	        std::cout << "current task updated, active w rewritten" << std::endl;
+
+		}
+
+		/** get m_current_task
+		 *
+		 * @return m_current_task
+		 */
+		inline float64_t get_m_current_task() { return m_current_task; }
+
 		/** set if bias shall be enabled
 		 *
 		 * @param enable_bias if bias shall be enabled
@@ -185,10 +218,10 @@ class CLibLinearMTL : public CLinearMachine
 		/** set Q */
 		inline void setup_Q(int32_t nk, int32_t nt)
 		{
-            num_kernels = nk;
-            num_tasks = nt;
-            Q = SGMatrixList<float64_t>(num_kernels, num_tasks, num_tasks);
-            Q_inv = SGMatrixList<float64_t>(num_kernels, num_tasks, num_tasks);
+			num_kernels = nk;
+			num_tasks = nt;
+			Q = SGMatrixList<float64_t>(num_kernels, num_tasks, num_tasks);
+			Q_inv = SGMatrixList<float64_t>(num_kernels, num_tasks, num_tasks);
 		}
 
 		/** get Q[idx] */
@@ -230,28 +263,28 @@ class CLibLinearMTL : public CLinearMachine
 		 */
 		inline SGMatrixList<float64_t> get_W()
 		{
-            
-            int32_t w_size = V[0].num_rows;
+			
+			int32_t w_size = V[0].num_rows;
 
-            SGMatrixList<float64_t> W = SGMatrixList<float64_t>(num_kernels, w_size, num_tasks);
-            for (int32_t m=0; m<num_kernels; m++)
-            {
-                for (int32_t s=0; s<num_tasks; s++)
-                {
-                    float64_t* v_s = V[m].get_column_vector(s);
-                    for (int32_t t=0; t<num_tasks; t++)
-                    {
-                        float64_t sim_st = thetas[m] * Q_inv[m](s,t); //TODO check if Q_inv is correct
-                        for(int32_t i=0; i<w_size; i++)
-                        {
-                            //W[m].matrix[t*w_size + i] += sim_ts * v_s[i];
-                            W[m](i,t) += sim_st * v_s[i];
-                        }
-                    }
-                }
-            }
+			SGMatrixList<float64_t> new_W = SGMatrixList<float64_t>(num_kernels, w_size, num_tasks);
+			for (int32_t m=0; m<num_kernels; m++)
+			{
+				for (int32_t s=0; s<num_tasks; s++)
+				{
+					float64_t* v_s = V[m].get_column_vector(s);
+					for (int32_t t=0; t<num_tasks; t++)
+					{
+						float64_t sim_st = thetas[m] * Q_inv[m](s,t); //TODO check if Q_inv is correct
+						for(int32_t i=0; i<w_size; i++)
+						{
+							//new_W[m].matrix[t*w_size + i] += sim_ts * v_s[i];
+							new_W[m](i,t) += sim_st * v_s[i];
+						}
+					}
+				}
+			}
 
-			return W;
+			return new_W;
 		}
 
 		/** get V_m
@@ -260,8 +293,8 @@ class CLibLinearMTL : public CLinearMachine
 		 */
 		inline SGMatrix<float64_t> get_Vm(int32_t m)
 		{
-            return V[m];
-        }
+			return V[m];
+		}
 
 		/** get W_m
 		 *
@@ -269,24 +302,24 @@ class CLibLinearMTL : public CLinearMachine
 		 */
 		inline SGMatrix<float64_t> get_Wm(int32_t m)
 		{
-            
-            int32_t w_size = V[0].num_rows;
+			
+			int32_t w_size = V[0].num_rows;
 
-            SGMatrix<float64_t> Wm = SGMatrix<float64_t>(w_size, num_tasks);
-            Wm.zero();
+			SGMatrix<float64_t> Wm = SGMatrix<float64_t>(w_size, num_tasks);
+			Wm.zero();
 
-            for (int32_t s=0; s<num_tasks; s++)
-            {
-                float64_t* v_s = V[m].get_column_vector(s);
-                for (int32_t t=0; t<num_tasks; t++)
-                {
-                    float64_t sim_st = thetas[m] * Q_inv[m](s,t);
-                    for(int32_t i=0; i<w_size; i++)
-                    {
-                        Wm(i,t) += sim_st * v_s[i];
-                    }
-                }
-            }
+			for (int32_t s=0; s<num_tasks; s++)
+			{
+				float64_t* v_s = V[m].get_column_vector(s);
+				for (int32_t t=0; t<num_tasks; t++)
+				{
+					float64_t sim_st = thetas[m] * Q_inv[m](s,t);
+					for(int32_t i=0; i<w_size; i++)
+					{
+						Wm(i,t) += sim_st * v_s[i];
+					}
+				}
+			}
 
 			return Wm;
 		}
@@ -338,7 +371,7 @@ class CLibLinearMTL : public CLinearMachine
 
 	private:
 		/** set up parameters */
-        void init();
+		void init();
 
 		void solve_l2r_l1l2_svc(
 			const problem *prob, double eps, double Cp, double Cn);
@@ -362,17 +395,17 @@ class CLibLinearMTL : public CLinearMachine
 		/** keep track of alphas */
 		SGVector<float64_t> alphas;
 
-        /** vector of MKL variables */
-        SGVector<float64_t> thetas;
+		/** vector of MKL variables */
+		SGVector<float64_t> thetas;
 
 		/** p-norm for MKL */
-        float64_t p_norm;
+		float64_t p_norm;
 
 		/** set number of tasks */
-        int32_t num_tasks;
+		int32_t num_tasks;
 
 		/** set number of kernels */
-        int32_t num_kernels;
+		int32_t num_kernels;
 
 		/** task indicator left hand side */
 		SGVector<int32_t> task_indicator_lhs;
@@ -389,8 +422,14 @@ class CLibLinearMTL : public CLinearMachine
 		/** parameter matrix n * d */
 		SGMatrixList<float64_t> V;
 
-        /** duality gap */
-        float64_t duality_gap;
+		/** parameter matrix n * d */
+		SGMatrixList<float64_t> W;
+
+		/** duality gap */
+		float64_t duality_gap;
+
+		/** active w (for prediction) **/
+		int32_t m_current_task;
 
 };
 
