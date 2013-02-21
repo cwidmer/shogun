@@ -50,6 +50,7 @@ CLibLinearMTL::CLibLinearMTL(
 
 void CLibLinearMTL::init()
 {
+	optimize_theta=true;
 	use_bias=false;
 	C1=1;
 	C2=1;
@@ -351,28 +352,31 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 		}
 
         // theta update
-        W = get_W();
-
-        for (int32_t m=0; m!=num_kernels; m++)
+        if (optimize_theta)
         {
-            float64_t norm_wm = 0;
-            for (int32_t k=0; k!=num_tasks; k++)
+            W = get_W();
+
+            for (int32_t m=0; m!=num_kernels; m++)
             {
-                float64_t* w_k = W[m].get_column_vector(k);
-                for (int32_t t=0; t!=num_tasks; t++)
+                float64_t norm_wm = 0;
+                for (int32_t k=0; k!=num_tasks; k++)
                 {
-                    float64_t* w_t = W[m].get_column_vector(t);
-                    for (int32_t i=0; i!=w_size; i++)
+                    float64_t* w_k = W[m].get_column_vector(k);
+                    for (int32_t t=0; t!=num_tasks; t++)
                     {
-                        norm_wm += Q_inv[m](k,t) * w_k[i] * w_t[i];
+                        float64_t* w_t = W[m].get_column_vector(t);
+                        for (int32_t i=0; i!=w_size; i++)
+                        {
+                            norm_wm += Q_inv[m](k,t) * w_k[i] * w_t[i];
+                        }
                     }
                 }
+                thetas[m] = CMath::pow(norm_wm, 1.0/(p_norm+1));
             }
-            thetas[m] = CMath::pow(norm_wm, 1.0/(p_norm+1));
-        }
  
-        // normalize to p-norm
-        thetas.scale(1.0 / thetas.qnorm(thetas.vector, num_kernels, p_norm));
+            // normalize to p-norm
+            thetas.scale(1.0 / thetas.qnorm(thetas.vector, num_kernels, p_norm));
+        }
 
 		iter++;
 		float64_t gap=PGmax_new - PGmin_new;
@@ -418,45 +422,6 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 
 float64_t CLibLinearMTL::compute_primal_obj()
 {
-	/* python protype
-	   num_param = param.shape[0]
-	   num_dim = len(all_xt[0])
-	   num_tasks = int(num_param / num_dim)
-	   num_examples = len(all_xt)
-
-# vector to matrix
-W = param.reshape(num_tasks, num_dim)
-
-obj = 0
-
-reg_obj = 0
-loss_obj = 0
-
-assert len(all_xt) == len(all_xt) == len(task_indicator)
-
-# L2 regularizer
-for t in xrange(num_tasks):
-reg_obj += 0.5 * np.dot(W[t,:], W[t,:])
-
-# MTL regularizer
-for s in xrange(num_tasks):
-for t in xrange(num_tasks):
-reg_obj += 0.5 * L[s,t] * np.dot(W[s,:], W[t,:])
-
-# loss
-for i in xrange(num_examples):
-ti = task_indicator[i]
-t = all_lt[i] * np.dot(W[ti,:], all_xt[i])
-# hinge
-loss_obj += max(0, 1 - t)
-
-
-# combine to final objective
-obj = reg_obj + C * loss_obj
-
-
-return obj
-*/
 
 	SG_INFO("DONE to compute Primal OBJ\n")
 	// calculate objective value
@@ -466,18 +431,6 @@ return obj
 	int32_t num_vec = features->get_num_vectors();
 	int32_t w_size = features->get_dim_feature_space();
 
-    /*
-	// L2 regularizer
-	for (int32_t t=0; t<num_tasks; t++)
-	{
-		float64_t* w_t = W.get_column_vector(t);
-
-		for(int32_t i=0; i<w_size; i++)
-		{
-			obj += 0.5 * w_t[i]*w_t[i];
-		}
-	}
-    */
     
 	// MTL regularizer
     for (int32_t m=0; m<num_kernels; m++)

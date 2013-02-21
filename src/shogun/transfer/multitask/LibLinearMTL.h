@@ -161,6 +161,18 @@ class CLibLinearMTL : public CLinearMachine
 			num_tasks = nt;
 		}
 
+		/** set optimize_theta */
+		inline void set_optimize_theta(float64_t ot)
+		{
+			optimize_theta = ot;
+		}
+
+		/** get optimize_theta */
+		inline float64_t get_optimize_theta()
+		{
+			return optimize_theta;
+		}
+
 		/** set p_norm */
 		inline void set_p_norm(float64_t pn)
 		{
@@ -168,7 +180,7 @@ class CLibLinearMTL : public CLinearMachine
 		}
 
 		/** get p_norm */
-		inline float64_t get_p_norm(float64_t pn)
+		inline float64_t get_p_norm()
 		{
 			return p_norm;
 		}
@@ -430,6 +442,9 @@ class CLibLinearMTL : public CLinearMachine
 
 		/** active w (for prediction) **/
 		int32_t m_current_task;
+
+		/** flag indicating if MKL is turned on **/
+		bool optimize_theta;
 
 };
 
