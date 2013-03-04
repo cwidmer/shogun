@@ -328,7 +328,7 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 			{   
 
                 // update distance
-				d = -G/(QD[i] * thetas.sum(thetas));
+				d = -G/(QD[i] * thetas.sum(thetas)); // * Q_inv[m](i,i)
 
 				// save previous alpha
 				double alpha_old = alphas[i];
@@ -367,7 +367,7 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
                         float64_t* w_t = W[m].get_column_vector(t);
                         for (int32_t i=0; i!=w_size; i++)
                         {
-                            norm_wm += Q_inv[m](k,t) * w_k[i] * w_t[i];
+                            norm_wm += Q[m](k,t) * w_k[i] * w_t[i];
                         }
                     }
                 }
