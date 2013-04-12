@@ -205,6 +205,7 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 	double PGmax_old = CMath::INFTY;
 	double PGmin_old = -CMath::INFTY;
 	double PGmax_new, PGmin_new;
+	double tmp_gap = CMath::INFTY;
 
 	// matrix V (d x num_tasks)
 	V = SGMatrixList<float64_t>(num_kernels,w_size,num_tasks);
@@ -217,6 +218,8 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 	thetas = SGVector<float64_t>(num_kernels);
     thetas.set_const(1.0);
     thetas.scale(1.0 / thetas.qnorm(thetas.vector, num_kernels, p_norm));
+
+    thetas.display_vector("theta_0");
 
 	// default solver_type: L2R_L2LOSS_SVC_DUAL
 	double diag[3] = {0.5/Cn, 0, 0.5/Cp};
@@ -351,38 +354,62 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 			}
 		}
 
+        
+
         // theta update
         if (optimize_theta)
         {
-            W = get_W();
 
-            for (int32_t m=0; m!=num_kernels; m++)
+            float64_t current_gap = compute_duality_gap();
+            std::cout << "current_gap: " << current_gap << ", primal obj: " << compute_primal_obj() << ", dual obj: " << compute_dual_obj() << std::endl;
+
+            if (current_gap < tmp_gap) 
             {
-                float64_t norm_wm = 0;
-                for (int32_t k=0; k!=num_tasks; k++)
+                tmp_gap = current_gap;
+
+                W = get_W();
+
+                for (int32_t m=0; m!=num_kernels; m++)
                 {
-                    float64_t* w_k = W[m].get_column_vector(k);
-                    for (int32_t t=0; t!=num_tasks; t++)
+                    float64_t norm_wm = 0;
+                    for (int32_t k=0; k!=num_tasks; k++)
                     {
-                        float64_t* w_t = W[m].get_column_vector(t);
-                        for (int32_t i=0; i!=w_size; i++)
+                        float64_t* w_k = W[m].get_column_vector(k);
+                        for (int32_t t=0; t!=num_tasks; t++)
                         {
-                            norm_wm += Q[m](k,t) * w_k[i] * w_t[i];
+                            float64_t* w_t = W[m].get_column_vector(t);
+                            for (int32_t i=0; i!=w_size; i++)
+                            {
+                                norm_wm += Q[m](k,t) * w_k[i] * w_t[i];
+                            }
                         }
                     }
+                    thetas[m] = CMath::pow(norm_wm, 1.0/(p_norm+1));
                 }
-                thetas[m] = CMath::pow(norm_wm, 1.0/(p_norm+1));
+     
+                // normalize to p-norm
+                thetas.display_vector("theta before norm");
+                thetas.scale(1.0 / thetas.qnorm(thetas.vector, num_kernels, p_norm));
+                thetas.display_vector("theta_norm");
+                std::cout << "updating theta" << std::endl;
             }
- 
-            // normalize to p-norm
-            thetas.scale(1.0 / thetas.qnorm(thetas.vector, num_kernels, p_norm));
+			else
+			{
+				active_size = l;
+				PGmax_old = CMath::INFTY;
+				PGmin_old = -CMath::INFTY;
+				continue;
+			}
         }
 
 		iter++;
 		float64_t gap=PGmax_new - PGmin_new;
 		SG_SABS_PROGRESS(gap, -CMath::log10(gap), -CMath::log10(1), -CMath::log10(eps), 6)
 
-		if(gap <= eps)
+        //TODO: use real gap here?
+		//if(gap <= eps)
+		//if(optimize_theta && (compute_duality_gap() <= eps) || !optimize_theta && (gap <= eps))
+		if(!optimize_theta && (gap <= eps))
 		{
 			if(active_size == l)
 				break;
@@ -423,7 +450,7 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 float64_t CLibLinearMTL::compute_primal_obj()
 {
 
-	SG_INFO("DONE to compute Primal OBJ\n")
+	SG_INFO("START to compute Primal OBJ\n")
 	// calculate objective value
 	SGMatrixList<float64_t> W = get_W();
 
@@ -573,7 +600,7 @@ float64_t CLibLinearMTL::compute_dual_obj_alphas()
 
 float64_t CLibLinearMTL::compute_duality_gap()
 {
-	return 0.0;
+	return compute_primal_obj() - compute_dual_obj();
 }
 
 
