@@ -300,9 +300,11 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 			{
 				if (G > PGmax_old)
 				{
+					/*
 					active_size--;
 					CMath::swap(index[s], index[active_size]);
 					s--;
+					*/
 					continue;
 				}
 				else if (G < 0)
@@ -312,9 +314,11 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 			{
 				if (G < PGmin_old)
 				{
+					/*
 					active_size--;
 					CMath::swap(index[s], index[active_size]);
 					s--;
+					*/
 					continue;
 				}
 				else if (G > 0)
@@ -360,13 +364,14 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
         if (optimize_theta)
         {
 
+			/*
             float64_t current_gap = compute_duality_gap();
             std::cout << "current_gap: " << current_gap << ", primal obj: " << compute_primal_obj() << ", dual obj: " << compute_dual_obj() << std::endl;
 
             if (current_gap < tmp_gap) 
             {
                 tmp_gap = current_gap;
-
+			*/
                 W = get_W();
 
                 for (int32_t m=0; m!=num_kernels; m++)
@@ -392,6 +397,8 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
                 thetas.scale(1.0 / thetas.qnorm(thetas.vector, num_kernels, p_norm));
                 thetas.display_vector("theta_norm");
                 std::cout << "updating theta" << std::endl;
+
+			/*
             }
 			else
 			{
@@ -400,6 +407,7 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 				PGmin_old = -CMath::INFTY;
 				continue;
 			}
+			*/
         }
 
 		iter++;
@@ -436,6 +444,7 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 		SG_WARNING("reaching max number of iterations\nUsing -s 2 may be faster"
 				"(also see liblinear FAQ)\n\n");
 	}
+
 
     // store final parameter vectors
     W = get_W();
