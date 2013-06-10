@@ -99,7 +99,7 @@ class CLibLinearMTL : public CLinearMachine
 
 			int32_t w_size = V[0].num_rows;
 
-            W = get_W();
+            //W = get_W();
             w.zero();
 
             for (int32_t m=0; m!=num_kernels; m++)

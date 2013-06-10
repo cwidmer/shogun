@@ -205,7 +205,7 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 	double PGmax_old = CMath::INFTY;
 	double PGmin_old = -CMath::INFTY;
 	double PGmax_new, PGmin_new;
-	double tmp_gap = CMath::INFTY;
+	//double tmp_gap = CMath::INFTY;
 
 	// matrix V (d x num_tasks)
 	V = SGMatrixList<float64_t>(num_kernels,w_size,num_tasks);
@@ -256,185 +256,185 @@ void CLibLinearMTL::solve_l2r_l1l2_svc(const problem *prob, double eps, double C
 	CTime start_time;
 	while (iter < max_iterations && !CSignal::cancel_computations())
 	{
-		if (m_max_train_time > 0 && start_time.cur_time_diff() > m_max_train_time)
-			break;
 
-		PGmax_new = -CMath::INFTY;
-		PGmin_new = CMath::INFTY;
+		std::cout << "outer loop" << std::endl;
 
-		for (int i=0; i<active_size; i++)
+		while (iter < max_iterations && !CSignal::cancel_computations())
 		{
-			int j = i+rand()%(active_size-i);
-			CMath::swap(index[i], index[j]);
-		}
-
-		for (s=0;s<active_size;s++)
-		{
-			int32_t i = index[s];
-			int32_t yi = y[i];
-			int32_t ti = task_indicator_lhs[i];
-			C = upper_bound[GETI(i)];
-
-			// we compute the inner sum by looping over tasks
-			// this update is the main result of MTL_DCD
-			float64_t inner_sum = 0;
-			for (int32_t m=0; m!=num_kernels; m++)
-            {
-                for (int32_t k=0; k!=num_tasks; k++)
-                {
-                    //inner_sum += M[t,ti] * all_lt[i] * np.dot(V[t,:], all_xt[i])
-                    float64_t* v_k = V[m].get_column_vector(k);
-                    inner_sum += thetas[m] * Q_inv[m](k,ti) * yi * prob->x->dense_dot(i, v_k, n);
-
-                    //possibly deal with bias
-                    //if (prob->use_bias)
-                    //	G+=w[n];
-                }
-            }
-			// compute gradient
-			G = inner_sum-1.0;
-
-			// check if point can be removed from active set
-			PG = 0;
-			if (alphas[i] == 0)
-			{
-				if (G > PGmax_old)
-				{
-					/*
-					active_size--;
-					CMath::swap(index[s], index[active_size]);
-					s--;
-					*/
-					continue;
-				}
-				else if (G < 0)
-					PG = G;
-			}
-			else if (alphas[i] == C)
-			{
-				if (G < PGmin_old)
-				{
-					/*
-					active_size--;
-					CMath::swap(index[s], index[active_size]);
-					s--;
-					*/
-					continue;
-				}
-				else if (G > 0)
-					PG = G;
-			}
-			else
-				PG = G;
-
-
-			PGmax_new = CMath::max(PGmax_new, PG);
-			PGmin_new = CMath::min(PGmin_new, PG);
-
-			if(fabs(PG) > 1.0e-12)
-			{   
-
-                // update distance
-				d = -G/(QD[i] * thetas.sum(thetas)); // * Q_inv[m](i,i)
-
-				// save previous alpha
-				double alpha_old = alphas[i];
-
-				// project onto feasible set
-				alphas[i] = CMath::max(0.0, CMath::min(C, alphas[i] + d));
-
-                // clipped d
-                double clip_d = (alphas[i] - alpha_old) * yi;
-
-				// update corresponding weight vector
-    			for (int32_t m=0; m!=num_kernels; m++)
-                {
-    				float64_t* v = V[m].get_column_vector(ti);
-	    			prob->x->add_to_dense_vec(clip_d, i, v, n);
-                }
-
-				//if (prob->use_bias)
-				//	w[n]+=d;
-			}
-		}
-
-        
-
-        // theta update
-        if (optimize_theta)
-        {
-
-			/*
-            float64_t current_gap = compute_duality_gap();
-            std::cout << "current_gap: " << current_gap << ", primal obj: " << compute_primal_obj() << ", dual obj: " << compute_dual_obj() << std::endl;
-
-            if (current_gap < tmp_gap) 
-            {
-                tmp_gap = current_gap;
-			*/
-                W = get_W();
-
-                for (int32_t m=0; m!=num_kernels; m++)
-                {
-                    float64_t norm_wm = 0;
-                    for (int32_t k=0; k!=num_tasks; k++)
-                    {
-                        float64_t* w_k = W[m].get_column_vector(k);
-                        for (int32_t t=0; t!=num_tasks; t++)
-                        {
-                            float64_t* w_t = W[m].get_column_vector(t);
-                            for (int32_t i=0; i!=w_size; i++)
-                            {
-                                norm_wm += Q[m](k,t) * w_k[i] * w_t[i];
-                            }
-                        }
-                    }
-                    thetas[m] = CMath::pow(norm_wm, 1.0/(p_norm+1));
-                }
-     
-                // normalize to p-norm
-                thetas.display_vector("theta before norm");
-                thetas.scale(1.0 / thetas.qnorm(thetas.vector, num_kernels, p_norm));
-                thetas.display_vector("theta_norm");
-                std::cout << "updating theta" << std::endl;
-
-			/*
-            }
-			else
-			{
-				active_size = l;
-				PGmax_old = CMath::INFTY;
-				PGmin_old = -CMath::INFTY;
-				continue;
-			}
-			*/
-        }
-
-		iter++;
-		float64_t gap=PGmax_new - PGmin_new;
-		SG_SABS_PROGRESS(gap, -CMath::log10(gap), -CMath::log10(1), -CMath::log10(eps), 6)
-
-        //TODO: use real gap here?
-		//if(gap <= eps)
-		//if(optimize_theta && (compute_duality_gap() <= eps) || !optimize_theta && (gap <= eps))
-		if(!optimize_theta && (gap <= eps))
-		{
-			if(active_size == l)
+			if (m_max_train_time > 0 && start_time.cur_time_diff() > m_max_train_time)
 				break;
-			else
+
+			PGmax_new = -CMath::INFTY;
+			PGmin_new = CMath::INFTY;
+
+			for (int i=0; i<active_size; i++)
 			{
-				active_size = l;
-				PGmax_old = CMath::INFTY;
-				PGmin_old = -CMath::INFTY;
-				continue;
+				int j = i+rand()%(active_size-i);
+				CMath::swap(index[i], index[j]);
 			}
+
+			for (s=0;s<active_size;s++)
+			{
+				int32_t i = index[s];
+				int32_t yi = y[i];
+				int32_t ti = task_indicator_lhs[i];
+				C = upper_bound[GETI(i)];
+
+				// we compute the inner sum by looping over tasks
+				// this update is the main result of MTL_DCD
+				float64_t inner_sum = 0;
+				for (int32_t m=0; m!=num_kernels; m++)
+				{
+					for (int32_t k=0; k!=num_tasks; k++)
+					{
+						//inner_sum += M[t,ti] * all_lt[i] * np.dot(V[t,:], all_xt[i])
+						float64_t* v_k = V[m].get_column_vector(k);
+						inner_sum += thetas[m] * Q_inv[m](k,ti) * yi * prob->x->dense_dot(i, v_k, n);
+
+						//possibly deal with bias
+						//if (prob->use_bias)
+						//	G+=w[n];
+					}
+				}
+				// compute gradient
+				G = inner_sum-1.0;
+
+				// check if point can be removed from active set
+				PG = 0;
+				if (alphas[i] == 0)
+				{
+					if (G > PGmax_old)
+					{
+						active_size--;
+						CMath::swap(index[s], index[active_size]);
+						s--;
+						continue;
+					}
+					else if (G < 0)
+						PG = G;
+				}
+				else if (alphas[i] == C)
+				{
+					if (G < PGmin_old)
+					{
+						active_size--;
+						CMath::swap(index[s], index[active_size]);
+						s--;
+						continue;
+					}
+					else if (G > 0)
+						PG = G;
+				}
+				else
+					PG = G;
+
+
+				PGmax_new = CMath::max(PGmax_new, PG);
+				PGmin_new = CMath::min(PGmin_new, PG);
+
+				if(fabs(PG) > 1.0e-12)
+				{   
+
+					// update distance
+					d = -G/(QD[i] * thetas.sum(thetas)); // * Q_inv[m](i,i)
+
+					// save previous alpha
+					double alpha_old = alphas[i];
+
+					// project onto feasible set
+					alphas[i] = CMath::max(0.0, CMath::min(C, alphas[i] + d));
+
+					// clipped d
+					double clip_d = (alphas[i] - alpha_old) * yi;
+
+					// update corresponding weight vector
+					for (int32_t m=0; m!=num_kernels; m++)
+					{
+						float64_t* v = V[m].get_column_vector(ti);
+						prob->x->add_to_dense_vec(clip_d, i, v, n);
+					}
+
+					//if (prob->use_bias)
+					//	w[n]+=d;
+				}
+			}
+
+			
+			iter++;
+			float64_t gap=PGmax_new - PGmin_new;
+			SG_SABS_PROGRESS(gap, -CMath::log10(gap), -CMath::log10(1), -CMath::log10(eps), 6)
+
+			//TODO: use real gap here?
+			if(gap <= eps)
+			//if(optimize_theta && (compute_duality_gap() <= eps) || !optimize_theta && (gap <= eps))
+			//if(!optimize_theta && (gap <= eps))
+			{
+				if(active_size == l)
+					break;
+				else
+				{
+					active_size = l;
+					PGmax_old = CMath::INFTY;
+					PGmin_old = -CMath::INFTY;
+					continue;
+				}
+			}
+			PGmax_old = PGmax_new;
+			PGmin_old = PGmin_new;
+			if (PGmax_old <= 0)
+				PGmax_old = CMath::INFTY;
+			if (PGmin_old >= 0)
+				PGmin_old = -CMath::INFTY;
 		}
-		PGmax_old = PGmax_new;
-		PGmin_old = PGmin_new;
-		if (PGmax_old <= 0)
-			PGmax_old = CMath::INFTY;
-		if (PGmin_old >= 0)
-			PGmin_old = -CMath::INFTY;
+
+		// theta update
+		if (!optimize_theta)
+		{ 
+			break;
+		} else {
+
+			SGVector<float64_t> thetas_diff = thetas.clone();
+			W = get_W();
+
+			for (int32_t m=0; m!=num_kernels; m++)
+			{
+				float64_t norm_wm = 0;
+				for (int32_t k=0; k!=num_tasks; k++)
+				{
+					float64_t* w_k = W[m].get_column_vector(k);
+					for (int32_t t=0; t!=num_tasks; t++)
+					{
+						float64_t* w_t = W[m].get_column_vector(t);
+						for (int32_t i=0; i!=w_size; i++)
+						{
+							norm_wm += Q[m](k,t) * w_k[i] * w_t[i];
+						}
+					}
+				}
+				thetas[m] = CMath::pow(norm_wm, 1.0/(p_norm+1));
+			}
+ 
+			// normalize to p-norm
+			thetas.display_vector("theta before norm");
+			thetas.scale(1.0 / thetas.qnorm(thetas.vector, num_kernels, p_norm));
+			thetas.display_vector("theta_norm");
+			std::cout << "updating theta" << std::endl;
+
+			// stopping criterion
+			thetas_diff.scale(-1);
+			thetas_diff += thetas;
+
+			float64_t tmp_diff = thetas_diff.qnorm(thetas_diff.vector, num_kernels, p_norm);
+
+			SG_INFO("tmp diff after theta step, |theta_old - theta|_p = %f\n", tmp_diff);
+			std::cout << "tmp diff: " << tmp_diff << std::endl;
+			
+			if (tmp_diff < 0.01)
+			{
+				break;
+			}
+
+		}
 	}
 
 	SG_DONE()
